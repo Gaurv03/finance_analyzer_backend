@@ -6,6 +6,9 @@ import dotenv from 'dotenv';
 import cookieParser from "cookie-parser";
 import cors from "cors";
 import router from './routes/index';
+import { statusCodes } from "./helpers";
+
+const statusCode = new statusCodes();
 
 
 // Initialize environment variables ASAP
@@ -29,7 +32,7 @@ app.use(cors(corsOption));
 // Root Endpoint
 
 app.get('/', (_req, res) => {
-    res.send('Server is up and running!');
+    return statusCode.success(res, 'Server is up and running!');
 });
 
 // API Routes

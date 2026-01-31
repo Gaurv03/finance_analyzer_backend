@@ -1,4 +1,5 @@
-import { Entity, PrimaryGeneratedColumn, Column } from "typeorm"
+import { Entity, PrimaryGeneratedColumn, Column, Index, OneToMany, CreateDateColumn, UpdateDateColumn } from "typeorm"
+import { Transaction } from "./transactions"
 
 export enum UserRole {
     ADMIN = 'ADMIN',
@@ -7,10 +8,11 @@ export enum UserRole {
 }
 
 @Entity()
+@Index(["email"], { unique: true })
 export class User {
 
-    @PrimaryGeneratedColumn()
-    id!: number
+    @PrimaryGeneratedColumn("uuid")
+    id!: string
 
     @Column({ type: "varchar" })
     firstName!: string
@@ -21,8 +23,8 @@ export class User {
     @Column({ type: "varchar", unique: true })
     email!: string
 
-    @Column({ type: "varchar" })
-    password!: string
+    @Column({ type: "varchar", name: "password_hash" })
+    passwordHash!: string
 
     @Column({
         type: "enum",
@@ -30,6 +32,22 @@ export class User {
         default: UserRole.AUDITOR
     })
     role!: UserRole
+
+    @Column({ default: true })
+    isActive!: boolean;
+
+    @Column({ default: 0 })
+    tokenVersion!: number;
+
+    @CreateDateColumn({ name: "created_at" })
+    createdAt!: Date;
+
+    @UpdateDateColumn({ name: "updated_at" })
+    updatedAt!: Date;
+
+    // relations
+    @OneToMany(() => Transaction, tx => tx.user)
+    transactions!: Transaction[];
 }
 
 

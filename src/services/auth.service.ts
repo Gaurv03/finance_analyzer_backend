@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { AppDataSource } from '../data-source';
-import { User } from '../entity/User';
+import { User } from '../entity/user';
 import * as bcrypt from 'bcryptjs';
 import * as jwt from 'jsonwebtoken';
 
@@ -9,7 +9,7 @@ class AuthService {
 
     public async signup(req: Request, res: Response) {
         try {
-            const { firstName, lastName, email, password } = req.body;
+            const { firstName, lastName, email, password, role } = req.body;
 
             if (!email || !password) {
                 throw new Error("Email and password are required");
@@ -25,13 +25,14 @@ class AuthService {
                 firstName,
                 lastName,
                 email,
-                password: hashedPassword,
+                passwordHash: hashedPassword,
+                role: role || undefined // Will fallback to entity default (AUDITOR)
             });
 
             await this.userRepository.save(user);
 
-            // Remove password from response for security
-            const { password: _, ...userWithoutPassword } = user;
+            // Remove sensitive fields from response
+            const { passwordHash: _, tokenVersion: __, ...userWithoutPassword } = user;
             return userWithoutPassword;
         } catch (error: any) {
             console.error(" [AuthService signup Error]: ", error.message);
@@ -52,7 +53,12 @@ class AuthService {
                 throw new Error("Invalid email or password");
             }
 
-            const isPasswordValid = await bcrypt.compare(password, user.password);
+            // Check if user is active
+            if (!user.isActive) {
+                throw new Error("Account is inactive. Please contact your administrator.");
+            }
+
+            const isPasswordValid = await bcrypt.compare(password, user.passwordHash);
             if (!isPasswordValid) {
                 throw new Error("Invalid email or password");
             }
@@ -64,7 +70,12 @@ class AuthService {
             }
 
             const token = jwt.sign(
-                { userId: user.id, email: user.email, role: user.role },
+                {
+                    userId: user.id,
+                    email: user.email,
+                    role: user.role,
+                    tokenVersion: user.tokenVersion // Included for token revocation support
+                },
                 secret,
                 {
                     expiresIn: '1d',
@@ -79,7 +90,7 @@ class AuthService {
                 maxAge: 24 * 60 * 60 * 1000 // 1 day
             });
 
-            const { password: _, ...userWithoutPassword } = user;
+            const { passwordHash: _, tokenVersion: __, ...userWithoutPassword } = user;
             return { user: userWithoutPassword, token };
         } catch (error: any) {
             console.error(" [AuthService login Error]: ", error.message);

@@ -1,13 +1,17 @@
 import { Request, Response, NextFunction } from 'express';
 import * as jwt from 'jsonwebtoken';
 import { ROLE_PERMISSIONS, Permission } from '../helpers/permissions';
-import { UserRole } from '../entity/User';
+import { UserRole } from '../entity/user';
+import { statusCodes } from '../helpers';
+
+const statusCode = new statusCodes();
 
 export interface AuthRequest extends Request {
     user?: {
-        userId: number;
+        userId: string;
         email: string;
         role: string;
+        tokenVersion?: number;
     };
 }
 
@@ -17,21 +21,17 @@ export const authMiddleware = (req: AuthRequest, res: Response, next: NextFuncti
         const token = req.cookies.token || req.headers.authorization?.split(' ')[1];
 
         if (!token) {
-            return res.status(401).json({
-                message: 'Authentication token is missing'
-            });
+            return statusCode.unauthorized(res, 'Authentication token is missing');
         }
 
         const secret = process.env.JWT_SECRET;
         if (!secret) {
             console.error('JWT_SECRET is not defined');
-            return res.status(500).json({
-                message: 'Internal server error'
-            });
+            return statusCode.internalServerError(res, 'Internal server error');
         }
 
         // 2. Verify token
-        const decoded = jwt.verify(token, secret) as { userId: number; email: string; role: string };
+        const decoded = jwt.verify(token, secret) as { userId: string; email: string; role: string; tokenVersion?: number };
 
         // 3. Attach user data to request
         req.user = decoded;
@@ -39,20 +39,18 @@ export const authMiddleware = (req: AuthRequest, res: Response, next: NextFuncti
         next();
     } catch (error) {
         console.error(' [AuthMiddleware Error]: ', error);
-        return res.status(401).json({
-            message: 'Invalid or expired token'
-        });
+        return statusCode.unauthorized(res, 'Invalid or expired token');
     }
 };
 
 export const checkRole = (roles: string[]) => {
     return (req: AuthRequest, res: Response, next: NextFunction) => {
         if (!req.user) {
-            return res.status(401).json({ message: 'Unauthorized' });
+            return statusCode.unauthorized(res, 'Unauthorized');
         }
 
         if (!roles.includes(req.user.role)) {
-            return res.status(403).json({ message: 'Forbidden: You do not have the required permissions' });
+            return statusCode.forbidden(res, 'Forbidden: You do not have the required permissions');
         }
 
         next();
@@ -62,7 +60,7 @@ export const checkRole = (roles: string[]) => {
 export const checkPermission = (requiredPermission: Permission) => {
     return (req: AuthRequest, res: Response, next: NextFunction) => {
         if (!req.user) {
-            return res.status(401).json({ message: 'Unauthorized' });
+            return statusCode.unauthorized(res, 'Unauthorized');
         }
 
         const userRole = req.user.role as UserRole;
@@ -71,9 +69,7 @@ export const checkPermission = (requiredPermission: Permission) => {
         const hasPermission = (permissionsForRole as readonly string[]).includes(requiredPermission);
 
         if (!hasPermission) {
-            return res.status(403).json({
-                message: `Forbidden: You do not have the required permission: ${requiredPermission}`
-            });
+            return statusCode.forbidden(res, `Forbidden: You do not have the required permission: ${requiredPermission}`);
         }
 
         next();
