@@ -1,0 +1,19 @@
+export const PERMISSIONS = {
+    USER_READ: "USER_READ",
+    USER_MANAGE: "USER_MANAGE",
+
+    TX_READ: "TX_READ",
+    TX_WRITE: "TX_WRITE",
+
+    RISK_READ: "RISK_READ",
+
+    AUDIT_READ: "AUDIT_READ",
+} as const;
+
+export type Permission = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];
+
+export const ROLE_PERMISSIONS = {
+    ADMIN: Object.values(PERMISSIONS),
+    ANALYST: [PERMISSIONS.TX_READ, PERMISSIONS.RISK_READ],
+    AUDITOR: [PERMISSIONS.TX_READ, PERMISSIONS.AUDIT_READ],
+} as const;
